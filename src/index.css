@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    /* Tối ưu hóa độ nét chữ trên mọi màn hình (Windows ClearType, Mac Retina) */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-size: 16px;
+  }
+
+  body {
+    @apply antialiased overflow-x-hidden text-slate-900;
+    background: radial-gradient(circle at 10% 20%, rgb(240, 249, 255) 0%, rgb(254, 243, 199, 0.4) 90%);
+    min-height: 100vh;
+    font-family: 'Lexend', 'Nunito', 'Be Vietnam Pro', system-ui, sans-serif;
+    letter-spacing: 0.012em;
+    line-height: 1.55;
+  }
+
+  /* Nâng độ tương phản cho các tiêu đề để chữ cực kỳ nét, không bị nhòe */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Lexend', 'Nunito', sans-serif;
+    letter-spacing: -0.01em;
+    color: #0f172a;
+    font-weight: 800;
+  }
+
+  p, span, label, input, button, select {
+    letter-spacing: 0.01em;
+  }
+}
+
+/* Chế độ Chữ To & Siêu Nét dành riêng cho các cháu tiểu học */
+body.font-large-mode {
+  font-size: 18px;
+}
+
+body.font-large-mode h1 { font-size: 2.2rem; }
+body.font-large-mode h2 { font-size: 1.85rem; }
+body.font-large-mode h3 { font-size: 1.5rem; }
+body.font-large-mode p, body.font-large-mode span {
+  font-weight: 600 !important;
+}
+
+/* Custom Kid-friendly scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 9999px;
+  border: 2px solid #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+.cartoon-card {
+  box-shadow: 0 8px 0px 0px rgba(0, 0, 0, 0.06), 0 20px 25px -5px rgba(0, 0, 0, 0.05);
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.cartoon-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 0px 0px rgba(0, 0, 0, 0.07), 0 25px 30px -5px rgba(0, 0, 0, 0.08);
+}
+
+.btn-kid {
+  box-shadow: 0 6px 0px 0px rgba(0, 0, 0, 0.15);
+  transition: all 0.15s ease-in-out;
+}
+
+.btn-kid:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 0px 0px rgba(0, 0, 0, 0.15);
+}
+
+.btn-kid:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0px 0px rgba(0, 0, 0, 0.15);
+}
+
+/* Tăng độ đậm nét cho câu hỏi bài tập và đề thi để học sinh dễ đọc */
+.exam-question-text {
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.6;
+}
+
+.exam-option-text {
+  font-weight: 600;
+  color: #1e293b;
+}
