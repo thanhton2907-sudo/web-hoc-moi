@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const projectDir = 'C:/Users/thanh/.gemini/antigravity/scratch/vuihoc-tieuhoc';
+const projectDir = __dirname;
 
 // 1. TẠO FILE HTML DUY NHẤT CHẠY TRỰC TIẾP (STANDALONE SINGLE-FILE HTML)
 // Người dùng chỉ cần nhấp đúp file này là web chạy ngay lập tức trên mọi trình duyệt

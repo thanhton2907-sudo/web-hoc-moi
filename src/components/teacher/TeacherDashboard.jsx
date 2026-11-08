@@ -39,6 +39,7 @@ import confetti from 'canvas-confetti';
 import { parseExamText } from '../../utils/examParser';
 import { splitMultiItemQuestion } from '../../utils/multiItemSplitter';
 import { MultiItemQuestion } from '../common/MultiItemQuestion';
+import { QuestionMedia } from '../common/QuestionMedia';
 import { extractTextFromFile, readImageAsDataUrl } from '../../utils/docExtract';
 
 const SUPPORTED_ACCEPT = '.pdf,.docx,.txt,.png,.jpg,.jpeg,.webp,.bmp';
@@ -60,7 +61,9 @@ export const TeacherDashboard = () => {
     englishMediaList, 
     addEnglishMedia, 
     removeEnglishMedia,
-    currentUser
+    currentUser,
+    teacherTargetContext,
+    setTeacherTargetContext
   } = useApp();
 
   // Active navigation tab in Teacher Dashboard
@@ -98,12 +101,15 @@ export const TeacherDashboard = () => {
   // State for Create / Edit Exam Form
   const [editingExamId, setEditingExamId] = useState(null);
   const [examTitle, setExamTitle] = useState('');
+  const [examUnit, setExamUnit] = useState('');
   const [examGrade, setExamGrade] = useState(1);
   const [examSubject, setExamSubject] = useState('math');
   const [examType, setExamType] = useState('practice'); // 'practice' | 'test' | 'review'
   const [examDuration, setExamDuration] = useState(20);
   const [examStatus, setExamStatus] = useState('published'); // 'published' | 'draft'
   const [originalFileInfo, setOriginalFileInfo] = useState(null);
+  const [examAudioUrl, setExamAudioUrl] = useState('');
+  const [examVideoUrl, setExamVideoUrl] = useState('');
   const [hasAudio, setHasAudio] = useState(false);
   const [audioScript, setAudioScript] = useState('');
   const [questions, setQuestions] = useState([
@@ -138,6 +144,19 @@ export const TeacherDashboard = () => {
   const [githubVideoUrl, setGithubVideoUrl] = useState('');
   const [mediaTranscript, setMediaTranscript] = useState('');
   const [uploadSuccessMsg, setUploadSuccessMsg] = useState('');
+
+  // Khi giáo viên bấm "Tải đề cho môn này" từ màn hình môn học của học sinh
+  React.useEffect(() => {
+    if (teacherTargetContext) {
+      if (teacherTargetContext.grade) {
+        setExamGrade(Number(teacherTargetContext.grade));
+      }
+      if (teacherTargetContext.subjectId) {
+        setExamSubject(teacherTargetContext.subjectId);
+      }
+      setActiveTab('create-exam');
+    }
+  }, [teacherTargetContext]);
 
   // 1. Quản lý Lớp Học
   const handleCreateClass = (e) => {
@@ -193,6 +212,7 @@ export const TeacherDashboard = () => {
 
       const defaultTitle = file.name.replace(/\.[^/.]+$/, '');
       setExamTitle(result.title || defaultTitle || examTitle);
+      if (result.meta?.unit) setExamUnit(result.meta.unit);
       if (result.meta?.grade) setExamGrade(result.meta.grade);
       if (result.meta?.subjectId) setExamSubject(result.meta.subjectId);
 
@@ -273,6 +293,57 @@ export const TeacherDashboard = () => {
 
   const handleRemoveQuestionImage = (qId) => {
     updateQuestion(qId, { image: undefined, imageSize: undefined });
+  };
+
+  // Upload âm thanh MP3 đính kèm câu hỏi (đọc thành Data URL để lưu offline vào đề)
+  const handleQuestionAudioUpload = (qId, file) => {
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) {
+      alert('Kích thước file audio nên nhỏ hơn 25MB để đảm bảo tải nhanh!');
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateQuestion(qId, { audioUrl: reader.result, audioFileName: file.name });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Upload video MP4 đính kèm câu hỏi
+  const handleQuestionVideoUpload = (qId, file) => {
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) {
+      alert('Với video nặng trên 50MB, Thầy/Cô nên dùng nút "Dán Link" (GitHub Releases) để tải siêu tốc nhé!');
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateQuestion(qId, { videoUrl: reader.result, videoFileName: file.name });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Nhập link Audio hoặc Video từ Web / GitHub / YouTube
+  const handleQuestionMediaUrlPrompt = (qId) => {
+    const q = questions.find(item => item.id === qId);
+    const current = q?.videoUrl || q?.audioUrl || '';
+    const input = window.prompt('Nhập link MP3 hoặc link Video MP4 / YouTube (Ví dụ link GitHub, raw link, YouTube):', current);
+    if (input !== null && input.trim()) {
+      const url = normalizeGithubVideo(input.trim());
+      if (/\.(mp3|wav|ogg|m4a|aac)(\?.*)?$/i.test(url)) {
+        updateQuestion(qId, { audioUrl: url, videoUrl: undefined });
+      } else {
+        updateQuestion(qId, { videoUrl: url, audioUrl: undefined });
+      }
+    }
+  };
+
+  // Gõ văn bản đọc mẫu tiếng Anh chuẩn US (TTS)
+  const handleQuestionAudioTextPrompt = (qId) => {
+    const q = questions.find(item => item.id === qId);
+    const current = q?.audioText || q?.question || '';
+    const input = window.prompt('Nhập đoạn văn bản tiếng Anh để hệ thống tự động phát âm chuẩn US (Web Speech API):', current);
+    if (input !== null && input.trim()) {
+      updateQuestion(qId, { audioText: input.trim() });
+    }
   };
 
   // Tự động tách câu hỏi thành các ý nhỏ
@@ -374,13 +445,16 @@ export const TeacherDashboard = () => {
 
     const examData = {
       title: examTitle.trim(),
+      unit: examUnit.trim() ? examUnit.trim() : (examType === 'test' ? 'BÀI KIỂM TRA ĐỊNH KỲ' : examType === 'review' ? 'ĐỀ ÔN TẬP TỔNG HỢP' : 'PHÉP TÍNH VÀ VẬN DỤNG'),
       grade: Number(examGrade),
       subjectId: examSubject,
       examType: examType,
       status: finalStatus,
       durationMinutes: Number(examDuration),
       creatorName: currentUser?.name || 'Giáo viên',
-      hasAudio: hasAudio,
+      hasAudio: hasAudio || !!examAudioUrl,
+      audioUrl: examAudioUrl || undefined,
+      videoUrl: examVideoUrl || undefined,
       originalFile: originalFileInfo,
       tags: [
         examType === 'test' ? 'Kiểm tra' : examType === 'review' ? 'Ôn tập' : 'Luyện tập',
@@ -389,7 +463,9 @@ export const TeacherDashboard = () => {
       ],
       questions: questions.map(q => ({
         ...q,
-        audioText: q.audioText || (hasAudio ? (audioScript || q.question) : undefined)
+        audioText: q.audioText || (hasAudio ? (audioScript || q.question) : undefined),
+        audioUrl: q.audioUrl || undefined,
+        videoUrl: q.videoUrl || undefined
       }))
     };
 
@@ -398,7 +474,11 @@ export const TeacherDashboard = () => {
       alert('✓ Đã cập nhật đề thi thành công!');
     } else {
       addNewExam(examData);
-      alert(finalStatus === 'published' ? '🎉 Đề thi đã được xuất bản cho học sinh làm bài!' : '💾 Đã lưu bản nháp đề thi thành công!');
+      const subjectObj = allSubjects.find(s => s.id === examSubject);
+      const subjName = subjectObj?.name || examSubject;
+      alert(finalStatus === 'published' 
+        ? `🎉 Đề "${examTitle.trim()}" đã được xuất bản!\nĐề đã vào thẳng mục [Lớp ${examGrade} - ${subjName}] để học sinh vào học ngay.` 
+        : '💾 Đã lưu bản nháp đề thi thành công!');
     }
 
     confetti({ particleCount: 70, spread: 60 });
@@ -409,12 +489,15 @@ export const TeacherDashboard = () => {
   const resetExamForm = () => {
     setEditingExamId(null);
     setExamTitle('');
+    setExamUnit('');
     setExamGrade(1);
     setExamSubject('math');
     setExamType('practice');
     setExamDuration(20);
     setExamStatus('published');
     setOriginalFileInfo(null);
+    setExamAudioUrl('');
+    setExamVideoUrl('');
     setHasAudio(false);
     setAudioScript('');
     setRawText('');
@@ -439,13 +522,16 @@ export const TeacherDashboard = () => {
   const handleEditExam = (exam) => {
     setEditingExamId(exam.id);
     setExamTitle(exam.title);
+    setExamUnit(exam.unit || '');
     setExamGrade(exam.grade);
     setExamSubject(exam.subjectId);
     setExamType(exam.examType || 'practice');
     setExamDuration(exam.durationMinutes || 20);
     setExamStatus(exam.status || 'published');
     setOriginalFileInfo(exam.originalFile || null);
-    setHasAudio(!!exam.hasAudio);
+    setExamAudioUrl(exam.audioUrl || '');
+    setExamVideoUrl(exam.videoUrl || '');
+    setHasAudio(!!exam.hasAudio || !!exam.audioUrl);
     setAudioScript(exam.audioScript || '');
     setQuestions(exam.questions || []);
     setActiveTab('create-exam');
@@ -1029,19 +1115,78 @@ export const TeacherDashboard = () => {
               </div>
             </div>
 
-            {/* Tên đề thi */}
-            <div>
-              <label className="block text-xs font-black text-slate-700 mb-1">
-                5. Tên Đề Thi <span className="text-rose-500">*</span>:
-              </label>
-              <input
-                type="text"
-                required
-                value={examTitle}
-                onChange={(e) => setExamTitle(e.target.value)}
-                placeholder="Ví dụ: Đề Kiểm Tra Cuối Học Kỳ 1 - Môn Toán Lớp 3"
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-xl font-black text-sm text-slate-800 focus:border-teal-400 focus:outline-none"
-              />
+            {/* Chủ đề & Tên bài thi (Hiển thị trực tiếp trên thẻ bài học của môn) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-black text-slate-700 mb-1">
+                  5. Chủ đề / Tên Chương (hiển thị màu cam trên thẻ môn):
+                </label>
+                <input
+                  type="text"
+                  value={examUnit}
+                  onChange={(e) => setExamUnit(e.target.value)}
+                  placeholder="Ví dụ: Phép nhân và phép chia, Bảng nhân 7..."
+                  className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-xl font-bold text-sm text-slate-800 focus:border-teal-400 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-700 mb-1">
+                  6. Tên Bài Học / Đề Thi <span className="text-rose-500">*</span>:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={examTitle}
+                  onChange={(e) => setExamTitle(e.target.value)}
+                  placeholder="Ví dụ: Bảng nhân 7 và Bí kíp tính nhẩm siêu tốc"
+                  className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-xl font-black text-sm text-slate-800 focus:border-teal-400 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Audio / Video dùng chung cho toàn bộ bài thi Tiếng Anh */}
+            <div className="bg-sky-50/80 border-2 border-sky-200 rounded-2xl p-3.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-sky-950 flex items-center gap-1.5">
+                  <Headphones className="w-4 h-4 text-sky-600" />
+                  <span>Bài Nghe Audio MP3 hoặc Video MP4 dùng chung cho cả đề thi (Tùy chọn):</span>
+                </span>
+                {(examAudioUrl || examVideoUrl) && (
+                  <button
+                    type="button"
+                    onClick={() => { setExamAudioUrl(''); setExamVideoUrl(''); }}
+                    className="text-[11px] font-black text-rose-600 hover:underline"
+                  >
+                    ✕ Gỡ bỏ
+                  </button>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500 font-semibold">
+                Dành cho bài thi Tiếng Anh có 1 đoạn audio / video bài nghe dài để học sinh vừa nghe vừa làm các câu hỏi.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Link file Audio MP3 (hoặc GitHub):</label>
+                  <input
+                    type="text"
+                    placeholder="https://.../listening_full.mp3"
+                    value={examAudioUrl}
+                    onChange={(e) => setExamAudioUrl(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:border-sky-400 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Link file Video MP4 hoặc YouTube:</label>
+                  <input
+                    type="text"
+                    placeholder="https://.../video.mp4 hoặc link YouTube"
+                    value={examVideoUrl}
+                    onChange={(e) => setExamVideoUrl(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:border-sky-400 focus:outline-none"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1242,6 +1387,93 @@ export const TeacherDashboard = () => {
                         >
                           ✕ Xóa ảnh
                         </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* KHU VỰC TÍCH HỢP AUDIO MP3 HOẶC VIDEO MP4 CHO CÂU HỎI (ĐẶC BIỆT CHO TIẾNG ANH) */}
+                  <div className="p-3 bg-white rounded-2xl border border-slate-200 space-y-2.5">
+                    <div className="flex items-center justify-between text-xs font-black text-slate-700 flex-wrap gap-2">
+                      <span className="flex items-center gap-1.5">
+                        <Headphones className="w-4 h-4 text-sky-600" />
+                        <span>Tích hợp Âm Thanh (MP3) hoặc Video (MP4) vào câu hỏi:</span>
+                      </span>
+
+                      <div className="flex items-center space-x-1 flex-wrap gap-1">
+                        {/* 1. Tải MP3 từ máy tính */}
+                        <label className="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 rounded-lg text-[11px] font-black cursor-pointer transition flex items-center gap-1 shadow-2xs">
+                          <span>🎵 Tải MP3</span>
+                          <input
+                            type="file"
+                            accept="audio/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              handleQuestionAudioUpload(q.id, e.target.files?.[0]);
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+
+                        {/* 2. Tải MP4 từ máy tính */}
+                        <label className="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 rounded-lg text-[11px] font-black cursor-pointer transition flex items-center gap-1 shadow-2xs">
+                          <span>🎬 Tải MP4</span>
+                          <input
+                            type="file"
+                            accept="video/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              handleQuestionVideoUpload(q.id, e.target.files?.[0]);
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+
+                        {/* 3. Dán Link MP3 / MP4 (GitHub, Cloud, YouTube) */}
+                        <button
+                          type="button"
+                          onClick={() => handleQuestionMediaUrlPrompt(q.id)}
+                          className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-[11px] font-bold transition shadow-2xs"
+                          title="Dán link trực tiếp từ GitHub, YouTube hoặc link web"
+                        >
+                          🔗 Dán Link
+                        </button>
+
+                        {/* 4. Giọng đọc mẫu phát âm tiếng Anh (TTS) */}
+                        <button
+                          type="button"
+                          onClick={() => handleQuestionAudioTextPrompt(q.id)}
+                          className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-[11px] font-black transition shadow-2xs"
+                          title="Gõ văn bản để máy tự phát âm tiếng Anh chuẩn US"
+                        >
+                          🗣️ Đọc mẫu US
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Hiển thị Audio / Video xem thử nếu câu hỏi đã có media */}
+                    {(q.audioUrl || q.videoUrl || q.audioText) && (
+                      <div className="p-3 bg-sky-50/70 rounded-xl border border-sky-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-black text-slate-800 flex items-center gap-1">
+                            {q.videoUrl ? '🎬 Video MP4 đính kèm câu hỏi:' : q.audioUrl ? '🎵 File Audio MP3 đính kèm câu hỏi:' : '🗣️ Giọng đọc tiếng Anh (TTS):'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => updateQuestion(q.id, { audioUrl: undefined, videoUrl: undefined, audioText: undefined })}
+                            className="text-[11px] font-black text-rose-600 hover:text-rose-700 hover:underline"
+                          >
+                            ✕ Xóa Media
+                          </button>
+                        </div>
+
+                        {/* Trình phát media trực tiếp */}
+                        <QuestionMedia
+                          audioUrl={q.audioUrl}
+                          videoUrl={q.videoUrl}
+                          audioText={q.audioText}
+                          subjectId={examSubject}
+                          title={q.audioText ? `Bài đọc mẫu: "${q.audioText}"` : undefined}
+                        />
                       </div>
                     )}
                   </div>

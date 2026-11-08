@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { AudioPlayer } from '../common/AudioPlayer';
+import { QuestionMedia } from '../common/QuestionMedia';
 import { MultiItemQuestion } from '../common/MultiItemQuestion';
 import { gradeMultiItemQuestion } from '../../utils/multiItemSplitter';
 import { playKidSound } from '../../utils/speech';
@@ -310,12 +311,13 @@ export const ExamBankAndTaker = () => {
           </div>
         )}
 
-        {/* Audio player DÀNH CHO TIẾNG ANH */}
-        {activeExam.subjectId === 'english' && q.audioText && (
-          <div className="my-3">
-            <AudioPlayer speechText={q.audioText} isEnglish={true} title="Nghe đoạn âm thanh tiếng Anh" />
-          </div>
-        )}
+        {/* Audio MP3 / Video MP4 TÍCH HỢP CHO BÀI LÀM TIẾNG ANH & CÁC MÔN */}
+        <QuestionMedia
+          audioUrl={q.audioUrl || q.audio || q.mp3}
+          videoUrl={q.videoUrl || q.video || q.mp4}
+          audioText={q.audioText}
+          subjectId={activeExam.subjectId}
+        />
 
         {/* 1. Dạng câu hỏi có nhiều ý nhỏ (Multi-Item) */}
         {isMulti ? (
@@ -535,6 +537,25 @@ export const ExamBankAndTaker = () => {
             Thời gian: {activeExam.durationMinutes || 'Tự do'} phút • Tổng số: {totalQ} câu hỏi
           </div>
         </div>
+
+        {/* Audio MP3 / Video MP4 dùng chung cho toàn bộ bài thi Tiếng Anh (nếu có) */}
+        {(activeExam.audioUrl || activeExam.videoUrl) && (
+          <div className="bg-white rounded-3xl p-5 border-3 border-sky-300 shadow-md cartoon-card">
+            <div className="flex items-center gap-2 text-sky-900 font-black text-sm mb-1">
+              <Headphones className="w-5 h-5 text-sky-600" />
+              <span>Bài Nghe / Video Dùng Chung Cho Cả Đề Thi:</span>
+            </div>
+            <p className="text-xs text-slate-500 font-semibold mb-3">
+              Bé có thể bật nghe đoạn âm thanh này để làm các câu hỏi nghe trong đề nhé!
+            </p>
+            <QuestionMedia
+              audioUrl={activeExam.audioUrl}
+              videoUrl={activeExam.videoUrl}
+              subjectId={activeExam.subjectId}
+              title={activeExam.title}
+            />
+          </div>
+        )}
 
         {/* Banner kết quả sau khi nộp bài */}
         {isExamFinished && examResult && (

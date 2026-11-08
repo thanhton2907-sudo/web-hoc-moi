@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 export const SubjectLessonsView = ({ subjectId, onBack, onSelectLesson, onOpenTeacher }) => {
-  const { lessons, exams, selectedGrade, currentUser, allSubjects } = useApp();
+  const { lessons, exams, selectedGrade, currentUser, allSubjects, setTeacherTargetContext } = useApp();
   const [filterType, setFilterType] = useState('all'); // 'all' | 'practice' | 'test' | 'review'
 
   const subjectsList = allSubjects || SUBJECTS_CONFIG;
@@ -25,6 +25,18 @@ export const SubjectLessonsView = ({ subjectId, onBack, onSelectLesson, onOpenTe
     name: 'Toán học',
     icon: '📐',
     color: 'from-amber-400 to-orange-500'
+  };
+
+  const handleOpenUploadForThisSubject = () => {
+    if (setTeacherTargetContext) {
+      setTeacherTargetContext({
+        grade: Number(selectedGrade),
+        subjectId: currentSubject.id
+      });
+    }
+    if (onOpenTeacher) {
+      onOpenTeacher();
+    }
   };
 
   // 1. Lọc các bài học chuẩn của môn học và khối lớp
@@ -66,7 +78,9 @@ export const SubjectLessonsView = ({ subjectId, onBack, onSelectLesson, onOpenTe
         subQuestions: q.subQuestions,
         points: q.points || 2,
         explanation: q.explanation || 'Đáp án chính xác.',
-        audioText: q.audioText
+        audioText: q.audioText,
+        audioUrl: q.audioUrl || q.audio || q.mp3,
+        videoUrl: q.videoUrl || q.video || q.mp4
       }))
     }));
 
@@ -93,7 +107,7 @@ export const SubjectLessonsView = ({ subjectId, onBack, onSelectLesson, onOpenTe
         <div className="flex items-center gap-2">
           {onOpenTeacher && (
             <button
-              onClick={onOpenTeacher}
+              onClick={handleOpenUploadForThisSubject}
               className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white rounded-2xl font-bold transition shadow-sm text-xs md:text-sm"
               title="Tải đề Word/PDF hoặc tạo đề mới cho môn này"
             >
@@ -105,7 +119,7 @@ export const SubjectLessonsView = ({ subjectId, onBack, onSelectLesson, onOpenTe
           {isTeacher && (
             <div className="hidden sm:flex text-xs font-bold text-teal-800 bg-teal-50 border border-teal-200 px-3 py-1.5 rounded-xl items-center gap-1.5">
               <CheckSquare className="w-4 h-4 text-teal-600" />
-              <span>Mọi đề Word/PDF tải lên sẽ vào thẳng đây!</span>
+              <span>Mọi đề tải lên sẽ tự động vào thẳng đây!</span>
             </div>
           )}
         </div>
@@ -126,14 +140,14 @@ export const SubjectLessonsView = ({ subjectId, onBack, onSelectLesson, onOpenTe
                 {currentSubject.name}
               </h2>
               <p className="text-white/90 text-xs md:text-sm font-semibold mt-0.5">
-                Khám phá bài học trực quan, bài tập tương tác và đề thi luyện tập!
+                Khám phá bài học trực quan, bài tập tương tác và trò chơi thú vị!
               </p>
             </div>
           </div>
 
           <div className="bg-white/20 backdrop-blur-md px-5 py-3 rounded-2xl text-center border border-white/30 self-stretch md:self-auto">
             <span className="block text-2xl md:text-3xl font-black">{allItems.length}</span>
-            <span className="text-[11px] font-bold uppercase tracking-wider">Bài học & Đề thi có sẵn</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider">BÀI HỌC CÓ SẴN</span>
           </div>
         </div>
       </div>
@@ -173,48 +187,45 @@ export const SubjectLessonsView = ({ subjectId, onBack, onSelectLesson, onOpenTe
             </p>
             {onOpenTeacher && (
               <button
-                onClick={onOpenTeacher}
+                onClick={handleOpenUploadForThisSubject}
                 className="mt-4 px-6 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white font-black text-sm rounded-2xl shadow-md inline-flex items-center gap-2 btn-kid"
               >
                 <FileUp className="w-4 h-4" />
-                <span>Tải Đề Word / PDF / Ảnh Ngay</span>
+                <span>Tải Đề Word / PDF / Ảnh Cho {currentSubject.name}</span>
               </button>
             )}
           </div>
         ) : (
           allItems.map((item, idx) => {
             const isLocked = !item.unlocked;
-            const isUploadedExam = item.isExam || item.unit?.includes('ĐỀ THI') || item.examId;
+            
+            // Format unit label and title to match exactly
+            const rawUnit = item.unit || (item.isExam ? 'Đề thi & Luyện tập' : 'Chủ đề bài học');
+            const unitText = rawUnit.toUpperCase().startsWith('CHỦ ĐỀ:') ? rawUnit.toUpperCase() : `CHỦ ĐỀ: ${rawUnit.toUpperCase()}`;
+            const rawTitle = item.title || 'Bài tập';
+            const titleText = (rawTitle.startsWith('Bài:') || rawTitle.startsWith('Đề:')) ? rawTitle : `Bài: ${rawTitle}`;
 
             return (
               <div
                 key={item.id}
                 onClick={() => !isLocked && onSelectLesson(item)}
-                className={`rounded-3xl p-5 md:p-6 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-3 ${
-                  isLocked
-                    ? 'bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed'
-                    : isUploadedExam
-                    ? 'bg-gradient-to-r from-amber-50/90 to-orange-50/90 border-amber-300 hover:border-amber-500 cursor-pointer cartoon-card shadow-sm'
-                    : 'bg-white border-amber-200 hover:border-amber-400 cursor-pointer cartoon-card'
+                className={`bg-white rounded-3xl p-5 md:p-6 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-2 border-slate-200 hover:border-amber-400 cursor-pointer cartoon-card shadow-sm ${
+                  isLocked ? 'bg-slate-100 opacity-60 cursor-not-allowed' : ''
                 }`}
               >
                 <div className="flex items-start space-x-4">
-                  {/* Status Circle / Number */}
+                  {/* Status Circle / Number - Exactly like screenshot */}
                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl shadow-sm flex-shrink-0 ${
                     item.completed
                       ? 'bg-emerald-500 text-white'
                       : isLocked
                       ? 'bg-slate-200 text-slate-400'
-                      : isUploadedExam
-                      ? 'bg-gradient-to-tr from-amber-500 to-orange-500 text-white shadow-md'
                       : 'bg-amber-400 text-amber-950'
                   }`}>
                     {item.completed ? (
                       <CheckCircle2 className="w-6 h-6" />
                     ) : isLocked ? (
                       <Lock className="w-5 h-5" />
-                    ) : isUploadedExam ? (
-                      <FileText className="w-6 h-6" />
                     ) : (
                       <span>{idx + 1}</span>
                     )}
@@ -222,26 +233,16 @@ export const SubjectLessonsView = ({ subjectId, onBack, onSelectLesson, onOpenTe
 
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-[11px] font-black uppercase tracking-wide px-2.5 py-0.5 rounded-full ${
-                        isUploadedExam
-                          ? 'bg-orange-100 text-orange-900 border border-orange-300'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {item.unit || (isUploadedExam ? 'Đề Thi Tải Lên' : 'Chủ đề bài học')}
+                      <span className="text-xs font-black uppercase tracking-wide text-amber-800">
+                        {unitText}
                       </span>
-
-                      {isUploadedExam && (
-                        <span className="text-[10px] font-extrabold text-teal-800 bg-teal-100 px-2 py-0.5 rounded-md border border-teal-300">
-                          ✓ Trích xuất từ tài liệu
-                        </span>
-                      )}
                     </div>
 
-                    <h3 className="font-black text-slate-900 text-base md:text-lg mt-1">
-                      {item.title}
+                    <h3 className="font-black text-slate-900 text-base md:text-xl mt-0.5">
+                      {titleText}
                     </h3>
 
-                    <div className="flex items-center space-x-2 text-xs font-semibold text-slate-600 mt-1 flex-wrap">
+                    <div className="flex items-center space-x-2 text-xs font-semibold text-slate-500 mt-1 flex-wrap">
                       <span>{item.exercises?.length || 0} bài tập tương tác</span>
                       {item.durationMinutes && (
                         <>
@@ -264,20 +265,16 @@ export const SubjectLessonsView = ({ subjectId, onBack, onSelectLesson, onOpenTe
                   </div>
                 </div>
 
-                {/* Right Button */}
+                {/* Right Button - Exactly like screenshot */}
                 <div className="flex items-center justify-end">
                   {isLocked ? (
                     <span className="text-xs font-bold text-slate-400 flex items-center gap-1 bg-slate-200/80 px-3 py-1.5 rounded-xl">
                       <Lock className="w-3.5 h-3.5" /> Mở khóa khi hoàn thành bài trước
                     </span>
                   ) : (
-                    <button className={`px-5 py-2.5 rounded-2xl font-black text-xs md:text-sm shadow-md btn-kid flex items-center space-x-1.5 ${
-                      isUploadedExam
-                        ? 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white'
-                        : 'bg-gradient-to-r from-amber-400 to-orange-400 text-amber-950'
-                    }`}>
+                    <button className="px-6 py-2.5 rounded-2xl font-black text-xs md:text-sm shadow-md btn-kid flex items-center space-x-2 bg-gradient-to-r from-amber-400 to-orange-400 text-amber-950 hover:from-amber-500 hover:to-orange-500">
                       <Play className="w-4 h-4 fill-current" />
-                      <span>{item.completed ? 'Làm lại' : isUploadedExam ? 'Bắt đầu làm bài' : 'Bắt đầu học'}</span>
+                      <span>{item.completed ? 'Làm lại' : 'Bắt đầu học'}</span>
                     </button>
                   )}
                 </div>

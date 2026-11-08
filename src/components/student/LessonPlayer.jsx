@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { playKidSound, speakText } from '../../utils/speech';
 import { MultiItemQuestion } from '../common/MultiItemQuestion';
+import { QuestionMedia } from '../common/QuestionMedia';
 import { gradeMultiItemQuestion } from '../../utils/multiItemSplitter';
 import { 
   ArrowLeft, 
@@ -268,6 +269,14 @@ export const LessonPlayer = ({ lesson, onBack }) => {
                   )}
                 </div>
               )}
+
+              {/* Tích hợp Audio MP3 hoặc Video MP4 cho câu hỏi Tiếng Anh */}
+              <QuestionMedia
+                audioUrl={ex.audioUrl || ex.audio || ex.mp3}
+                videoUrl={ex.videoUrl || ex.video || ex.mp4}
+                audioText={ex.audioText}
+                subjectId={lesson.subjectId}
+              />
 
               {/* Multiple Choice Form */}
               {ex.type === 'multiple-choice' && (

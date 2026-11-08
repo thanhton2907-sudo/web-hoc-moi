@@ -134,6 +134,7 @@ export const AppProvider = ({ children }) => {
   });
 
   const [selectedGrade, setSelectedGrade] = useState(1);
+  const [teacherTargetContext, setTeacherTargetContext] = useState(null); // { grade, subjectId }
 
   // Lưu trữ LocalStorage
   useEffect(() => {
@@ -646,11 +647,11 @@ export const AppProvider = ({ children }) => {
 
     // Nếu đề thi ở trạng thái Đã Xuất Bản ('published'), đồng bộ sang danh sách bài học môn đó
     if (examItem.status === 'published') {
-      const unitLabel = examItem.examType === 'test'
+      const unitLabel = newExam.unit || (examItem.examType === 'test'
         ? 'BÀI KIỂM TRA ĐỊNH KỲ'
         : examItem.examType === 'review'
         ? 'ĐỀ ÔN TẬP TỔNG HỢP'
-        : 'ĐỀ THI & LUYỆN TẬP';
+        : 'ĐỀ THI & LUYỆN TẬP');
 
       const newLessonFromExam = {
         id: 'lesson-' + examItem.id,
@@ -677,7 +678,9 @@ export const AppProvider = ({ children }) => {
           subQuestions: q.subQuestions,
           points: q.points || 2,
           explanation: q.explanation || 'Đáp án chính xác.',
-          audioText: q.audioText
+          audioText: q.audioText,
+          audioUrl: q.audioUrl || q.audio || q.mp3,
+          videoUrl: q.videoUrl || q.video || q.mp4
         }))
       };
       setLessons(prev => [newLessonFromExam, ...prev.filter(l => l.examId !== examItem.id)]);
@@ -701,11 +704,11 @@ export const AppProvider = ({ children }) => {
 
     if (updatedObj) {
       if (updatedObj.status === 'published') {
-        const unitLabel = updatedObj.examType === 'test'
+        const unitLabel = updatedObj.unit || (updatedObj.examType === 'test'
           ? 'BÀI KIỂM TRA ĐỊNH KỲ'
           : updatedObj.examType === 'review'
           ? 'ĐỀ ÔN TẬP TỔNG HỢP'
-          : 'ĐỀ THI & LUYỆN TẬP';
+          : 'ĐỀ THI & LUYỆN TẬP');
 
         setLessons(prev => {
           const filtered = prev.filter(l => l.examId !== examId);
@@ -734,7 +737,9 @@ export const AppProvider = ({ children }) => {
               subQuestions: q.subQuestions,
               points: q.points || 2,
               explanation: q.explanation || 'Đáp án chính xác.',
-              audioText: q.audioText
+              audioText: q.audioText,
+              audioUrl: q.audioUrl || q.audio || q.mp3,
+              videoUrl: q.videoUrl || q.video || q.mp4
             }))
           }, ...filtered];
         });
@@ -800,6 +805,8 @@ export const AppProvider = ({ children }) => {
       switchStudent,
       selectedGrade,
       setSelectedGrade,
+      teacherTargetContext,
+      setTeacherTargetContext,
       lessons,
       setLessons,
       addNewLesson,

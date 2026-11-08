@@ -11,6 +11,8 @@ const ANSWER_LINE = /^\s*(?:đáp\s*án|dap\s*an|answers?|key|đ\/?a|hướng\s*
 const EXPLAIN_LINE = /^\s*(?:giải\s*thích|lời\s*giải|hướng\s*dẫn\s*giải|explanation|giai\s*thich)\s*[:\-–]?\s*(.*)$/i;
 const AUDIO_LINE = /^\s*(?:audio|script|transcript|nghe|listen)\s*[:\-–]\s*(.+)$/i;
 const IMAGE_TAG = /\[IMAGE:\s*([^\]]+)\s*\]/i;
+const AUDIO_TAG = /\[\s*(?:audio|mp3|sound)\s*:\s*([^\]]+)\s*\]/i;
+const VIDEO_TAG = /\[\s*(?:video|mp4|clip)\s*:\s*([^\]]+)\s*\]/i;
 const BLANK = /\.{3,}|…|_{2,}|\(\s*\)/;
 // Nhận diện phân mục Phần I (Trắc nghiệm) và Phần II (Tự luận)
 const SECTION_CHOICE = /^\s*(?:phần|phan|part)?\s*(?:i|1|a)\s*[:.\-–]?\s*(?:trắc\s*nghiệm|trac\s*nghiem|khách\s*quan)/i;
@@ -64,9 +66,17 @@ const guessMeta = (text) => {
   if (/tiếng anh|english|listen|vocabulary/.test(lower)) subjectId = 'english';
   else if (/tiếng việt|chính tả|tập làm văn|luyện từ/.test(lower)) subjectId = 'vietnamese';
   else subjectId = 'math';
+
+  let unit = null;
+  const unitMatch = text.match(/(?:chủ\s*đề|chu\s*de|chương|chuong|unit)\s*[:\-–]?\s*([^\n\r]+)/i);
+  if (unitMatch) {
+    unit = unitMatch[1].trim();
+  }
+
   return {
     grade: gradeMatch ? Number(gradeMatch[1] || gradeMatch[2]) : null,
     subjectId,
+    unit
   };
 };
 
@@ -99,6 +109,8 @@ export const parseExamText = (rawText) => {
   const blocks = [];
   const preamble = [];
   let preambleImage = null;
+  let preambleAudio = null;
+  let preambleVideo = null;
   let cur = null;
   let keyMap = {};
   let inKeySection = false;
@@ -118,6 +130,30 @@ export const parseExamText = (rawText) => {
         cur.image = imgData;
       } else {
         preambleImage = imgData;
+      }
+      continue;
+    }
+
+    // Nhận diện thẻ âm thanh [AUDIO:...] hoặc [MP3:...]
+    const audioMatch = line.match(AUDIO_TAG);
+    if (audioMatch) {
+      const audioData = audioMatch[1].trim();
+      if (cur) {
+        cur.audioUrl = audioData;
+      } else {
+        preambleAudio = audioData;
+      }
+      continue;
+    }
+
+    // Nhận diện thẻ video [VIDEO:...] hoặc [MP4:...]
+    const videoMatch = line.match(VIDEO_TAG);
+    if (videoMatch) {
+      const videoData = videoMatch[1].trim();
+      if (cur) {
+        cur.videoUrl = videoData;
+      } else {
+        preambleVideo = videoData;
       }
       continue;
     }
@@ -175,7 +211,12 @@ export const parseExamText = (rawText) => {
     }
     const au = line.match(AUDIO_LINE);
     if (au) {
-      cur.audioText = au[1].trim();
+      const val = au[1].trim();
+      if (/\.(mp3|wav|ogg|m4a|aac)(\?.*)?$/i.test(val) || /^https?:\/\//i.test(val)) {
+        cur.audioUrl = val;
+      } else {
+        cur.audioText = val;
+      }
       continue;
     }
     const opt = line.match(OPT_START);
@@ -228,6 +269,8 @@ export const parseExamText = (rawText) => {
       image: questionImage || (i === 0 ? preambleImage : null),
       imageSize: 'medium'
     };
+    if (b.audioUrl) base.audioUrl = b.audioUrl;
+    if (b.videoUrl) base.videoUrl = b.videoUrl;
     if (b.audioText) base.audioText = b.audioText;
 
     if (forced === 'choice' && b.options.length < 2) {
@@ -298,5 +341,14 @@ export const parseExamText = (rawText) => {
   }
 
   const title = preamble.find((l) => l.length > 6 && l.length < 140) || '';
-  return { title, questions, warnings, meta: guessMeta(text) };
+  return { 
+    title, 
+    questions, 
+    warnings, 
+    meta: {
+      ...guessMeta(text),
+      audioUrl: preambleAudio || null,
+      videoUrl: preambleVideo || null
+    }
+  };
 };
